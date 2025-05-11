@@ -9,8 +9,9 @@ import (
 )
 
 type Config struct {
-	ProxyAddress    string
-	ServerAddresses []string
+	BalanceAlgorithm string
+	ProxyAddress     string
+	ServerAddresses  []string
 }
 
 func LoadConfig() (*Config, error) {
@@ -19,9 +20,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	proxyAddress := strings.TrimSpace(os.Getenv("PROXY_ADDRESS"))
-	if proxyAddress == "" {
-		return nil, errors.New("no proxy address provided")
-	}
+
 	serverAddresses := strings.TrimSpace(os.Getenv("SERVER_ADDRESSES"))
 	if serverAddresses == "" {
 		return nil, errors.New("no server address provided")
@@ -31,5 +30,10 @@ func LoadConfig() (*Config, error) {
 		serverAddressesList[i] = strings.TrimSpace(serverAddressesList[i])
 	}
 
-	return &Config{proxyAddress, serverAddressesList}, nil
+	balanceAlgorithm := strings.TrimSpace(os.Getenv("BALANCE_ALGORITHM"))
+	if balanceAlgorithm == "" || len(serverAddressesList) == 1 {
+		balanceAlgorithm = "SingleServer"
+	}
+
+	return &Config{balanceAlgorithm, proxyAddress, serverAddressesList}, nil
 }
