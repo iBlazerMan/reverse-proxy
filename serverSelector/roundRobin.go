@@ -6,11 +6,8 @@ import (
 	"sync/atomic"
 )
 
-type serverInstance struct {
-	url *url.URL
-}
-
 type RoundRobin struct {
+	defaultSelector
 	servers []serverInstance
 	index   atomic.Uint64
 }

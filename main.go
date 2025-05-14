@@ -23,8 +23,8 @@ func main() {
 		reverseProxy = proxy.NewProxy(serverSelector.NewSingleServer(config.ServerAddresses[0]))
 	case "RoundRobin":
 		reverseProxy = proxy.NewProxy(serverSelector.NewRoundRobin(config.ServerAddresses))
-		// case "LeastConnection":
-		// 	reverseProxy = proxy.NewProxy()
+	case "LeastConnection":
+		reverseProxy = proxy.NewProxy(serverSelector.NewLeastConnection(config.ServerAddresses))
 	default:
 		log.Fatalf("Undefined balance algorithm: %v", config.BalanceAlgorithm)
 	}

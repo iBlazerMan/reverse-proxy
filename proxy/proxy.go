@@ -8,11 +8,13 @@ import (
 	"time"
 
 	"github.com/iBlazerMan/reverse-proxy/serverSelector"
+	"github.com/iBlazerMan/reverse-proxy/util"
 )
 
 func makeDirector(serverSelector serverSelector.ServerSelector) func(*http.Request) {
 	return func(req *http.Request) {
 		var serverUrl *url.URL = serverSelector.SelectServer()
+
 		req.URL.Scheme = serverUrl.Scheme
 		req.URL.Host = serverUrl.Host
 		req.Host = serverUrl.Host
@@ -22,11 +24,27 @@ func makeDirector(serverSelector serverSelector.ServerSelector) func(*http.Reque
 		req.Header.Set("X-Forwarded-For", req.RemoteAddr)
 		req.Header.Set("X-Forwarded-Host", req.Host)
 		req.Header.Del("Connection")
+
+		// add additional context to use when handling response
+		ctx := util.WithServerUrl(req.Context(), serverUrl)
+		*req = *req.WithContext(ctx)
 	}
 }
 
-func errorHandler(rw http.ResponseWriter, req *http.Request, err error) {
-	rw.WriteHeader(http.StatusBadGateway)
+func makeErrorHandler(serverSelector serverSelector.ServerSelector) func(http.ResponseWriter, *http.Request, error) {
+	return func(rw http.ResponseWriter, req *http.Request, err error) {
+		serverSelector.HandleError(rw, req, err)
+
+		// additional error handling logic here
+	}
+}
+
+func makeModifyResponse(serverSelector serverSelector.ServerSelector) func(*http.Response) error {
+	return func(res *http.Response) error {
+		return serverSelector.ModifyResponse(res)
+
+		// additional response modifier logic here
+	}
 }
 
 func NewProxy(serverSelector serverSelector.ServerSelector) *httputil.ReverseProxy {
@@ -46,6 +64,7 @@ func NewProxy(serverSelector serverSelector.ServerSelector) *httputil.ReversePro
 			ResponseHeaderTimeout: 5 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		},
-		ErrorHandler: errorHandler,
+		ErrorHandler:   makeErrorHandler(serverSelector),
+		ModifyResponse: makeModifyResponse(serverSelector),
 	}
 }
