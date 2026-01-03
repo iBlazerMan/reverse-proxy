@@ -1,38 +1,18 @@
 package proxy
 
 import (
+	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"time"
 
 	"github.com/iBlazerMan/reverse-proxy/serverSelector"
-	"github.com/iBlazerMan/reverse-proxy/util"
 )
-
-func makeDirector(serverSelector serverSelector.ServerSelector) func(*http.Request) {
-	return func(req *http.Request) {
-		var serverUrl *url.URL = serverSelector.SelectServer()
-
-		req.URL.Scheme = serverUrl.Scheme
-		req.URL.Host = serverUrl.Host
-		req.Host = serverUrl.Host
-		req.URL.Path = serverUrl.Path + req.URL.Path
-
-		// set forwarding header
-		req.Header.Set("X-Forwarded-For", req.RemoteAddr)
-		req.Header.Set("X-Forwarded-Host", req.Host)
-		req.Header.Del("Connection")
-
-		// add additional context to use when handling response
-		ctx := util.WithServerUrl(req.Context(), serverUrl)
-		*req = *req.WithContext(ctx)
-	}
-}
 
 func makeErrorHandler(serverSelector serverSelector.ServerSelector) func(http.ResponseWriter, *http.Request, error) {
 	return func(rw http.ResponseWriter, req *http.Request, err error) {
+		log.Printf("Proxy Error: Failed to reach backend %s: %v", req.URL.String(), err)
 		serverSelector.HandleError(rw, req, err)
 
 		// additional error handling logic here
@@ -42,16 +22,19 @@ func makeErrorHandler(serverSelector serverSelector.ServerSelector) func(http.Re
 func makeModifyResponse(serverSelector serverSelector.ServerSelector) func(*http.Response) error {
 	return func(res *http.Response) error {
 		return serverSelector.ModifyResponse(res)
-
-		// additional response modifier logic here
 	}
 }
 
 func NewProxy(serverSelector serverSelector.ServerSelector) *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{
-		Director: makeDirector(serverSelector),
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			targetUrl := serverSelector.SelectServer()
+
+			pr.SetURL(targetUrl)
+			pr.Out.Host = targetUrl.Host
+		},
 		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
+			Proxy: nil,
 			// TODO: add user defined options here
 			DialContext: (&net.Dialer{
 				Timeout:   2 * time.Second,

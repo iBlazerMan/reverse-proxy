@@ -10,7 +10,6 @@ import (
 
 type Config struct {
 	BalanceAlgorithm string
-	ProxyAddress     string
 	ServerAddresses  []string
 }
 
@@ -18,8 +17,6 @@ func LoadConfig() (*Config, error) {
 	if err := godotenv.Load(); err != nil {
 		return nil, err
 	}
-
-	proxyAddress := strings.TrimSpace(os.Getenv("PROXY_ADDRESS"))
 
 	serverAddresses := strings.TrimSpace(os.Getenv("SERVER_ADDRESSES"))
 	if serverAddresses == "" {
@@ -35,5 +32,5 @@ func LoadConfig() (*Config, error) {
 		balanceAlgorithm = "SingleServer"
 	}
 
-	return &Config{balanceAlgorithm, proxyAddress, serverAddressesList}, nil
+	return &Config{balanceAlgorithm, serverAddressesList}, nil
 }
