@@ -1,18 +1,17 @@
 package proxy
 
 import (
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"time"
 
 	"github.com/iBlazerMan/reverse-proxy/serverSelector"
+	"github.com/iBlazerMan/reverse-proxy/util"
 )
 
 func makeErrorHandler(serverSelector serverSelector.ServerSelector) func(http.ResponseWriter, *http.Request, error) {
 	return func(rw http.ResponseWriter, req *http.Request, err error) {
-		log.Printf("Proxy Error: Failed to reach backend %s: %v", req.URL.String(), err)
 		serverSelector.HandleError(rw, req, err)
 
 		// additional error handling logic here
@@ -32,6 +31,9 @@ func NewProxy(serverSelector serverSelector.ServerSelector) *httputil.ReversePro
 
 			pr.SetURL(targetUrl)
 			pr.Out.Host = targetUrl.Host
+
+			ctx := util.WithServerUrl(pr.Out.Context(), targetUrl)
+			pr.Out = pr.Out.WithContext(ctx)
 		},
 		Transport: &http.Transport{
 			Proxy: nil,

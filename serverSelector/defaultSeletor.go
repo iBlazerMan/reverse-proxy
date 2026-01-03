@@ -7,7 +7,12 @@ the ErrorHandler and ModifyResponse in proxy.go
 */
 package serverSelector
 
-import "net/http"
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+)
 
 type defaultSelector struct{}
 
@@ -15,4 +20,14 @@ func (*defaultSelector) ModifyResponse(*http.Response) error {
 	return nil
 }
 
-func (*defaultSelector) HandleError(http.ResponseWriter, *http.Request, error) {}
+func (ds *defaultSelector) HandleError(res http.ResponseWriter, req *http.Request, err error) {
+	log.Printf("Proxy Error for %s: %v", req.URL.String(), err)
+
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		res.WriteHeader(http.StatusGatewayTimeout)
+		res.Write([]byte("504 Gateway Timeout"))
+	} else {
+		res.WriteHeader(http.StatusBadGateway)
+		res.Write([]byte("502 Bad Gateway"))
+	}
+}

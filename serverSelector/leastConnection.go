@@ -1,7 +1,7 @@
 package serverSelector
 
 import (
-	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -50,23 +50,42 @@ func (lc *LeastConnection) SelectServer() *url.URL {
 	}
 	chosenServer.currReq.Add(1)
 
+	// DEBUG
+	// for i := range lc.servers {
+	// 	log.Printf("Server %s has %d current requests", lc.servers[i].url.String(), lc.servers[i].currReq.Load())
+	// }
+	// log.Printf("\n")
+
 	return chosenServer.url
 }
 
-func (lc *LeastConnection) ModifyResponse(res *http.Response) error {
+func (lc *LeastConnection) done(serverUrl *url.URL) error {
 	// extract server address and decrement server's currReq count
-	serverUrl, err := util.GetServerUrl(res.Request.Context())
-
-	if err != nil {
-		return err
+	if serverUrl == nil {
+		return fmt.Errorf("no server url provided to done function")
 	}
 
 	for i := range lc.servers {
-		if *(lc.servers[i].url) == *serverUrl {
+		if lc.servers[i].url.String() == serverUrl.String() {
 			lc.servers[i].currReq.Add(-1)
 			return nil
 		}
 	}
 
-	return errors.New("no existing server's url match the response context's url, no server current request count changed")
+	return fmt.Errorf("no existing server's url match the response context's url: %s", serverUrl.String())
+}
+
+func (lc *LeastConnection) ModifyResponse(res *http.Response) error {
+	serverUrl, err := util.GetServerUrl(res.Request.Context())
+	if err != nil {
+		return err
+	}
+	return lc.done(serverUrl)
+}
+
+// still need to decrement the server's currReq count on error, then call downstream error handler
+func (lc *LeastConnection) HandleError(rw http.ResponseWriter, req *http.Request, err error) {
+	serverUrl, _ := util.GetServerUrl(req.Context())
+	_ = lc.done(serverUrl)
+	lc.defaultSelector.HandleError(rw, req, err)
 }
